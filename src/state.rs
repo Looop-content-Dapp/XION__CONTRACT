@@ -75,3 +75,4 @@ pub enum PassStatus {
 
 
 pub const TOKENS_BY_OWNER: Map<&Addr, Vec<String>> = Map::new("tokens_by_owner");
+pub const TOKEN_ID_COUNTER: Item<u64> = Item::new("token_id_counter");

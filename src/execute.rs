@@ -3,7 +3,7 @@
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
 use cw721_base_soulbound::state::TokenInfo;
 use crate::error::ContractError;
-use crate::state::{Contract, PassExtension, CONFIG};
+use crate::state::{Contract, PassExtension, CONFIG, TOKEN_ID_COUNTER};
 use crate::state::PassStatus;
 use crate::helpers::validate_payment;
 // use crate::msg::{ExecuteMsg, PassMsg};
@@ -12,12 +12,16 @@ pub fn mint_pass(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    token_id: String,
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage).unwrap();
 
     // Validate payment
     validate_payment(&info, config.pass_price)?;
+
+    // Get and increment token ID counter
+    let counter = TOKEN_ID_COUNTER.load(deps.storage)?;
+    let token_id = format!("PASS{}", counter + 1);
+    TOKEN_ID_COUNTER.save(deps.storage, &(counter + 1))?;
 
     // Create new pass extension with timestamps
     let extension = PassExtension::new(
@@ -34,7 +38,7 @@ pub fn mint_pass(
         None => Ok(TokenInfo {
             owner: info.sender.clone(),
             approvals: vec![],
-            token_uri: None, //need to check if we need to add.
+            token_uri: None,
             extension,
         }),
     })?;
@@ -45,9 +49,7 @@ pub fn mint_pass(
     Ok(Response::new()
         .add_attribute("action", "mint_pass")
         .add_attribute("minter", info.sender)
-        .add_attribute("token_id", token_id)
-        // .add_attribute("expires_at", extension.expires_at.to_string())
-    )
+        .add_attribute("token_id", token_id))
 }
 
 pub fn renew_pass(

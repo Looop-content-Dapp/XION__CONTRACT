@@ -18,7 +18,7 @@ pub struct InstantiateMsg {
 // Custom Pass messages extending the base contract
 #[cw_serde]
 pub enum PassMsg {
-    MintPass { token_id: String },
+    MintPass {},  // Remove token_id parameter
     RenewPass { token_id: String },
     BurnExpiredPass { token_id: String },
 }

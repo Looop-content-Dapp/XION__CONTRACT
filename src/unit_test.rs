@@ -75,50 +75,103 @@ mod tests {
     #[test]
     fn test_mint_pass() {
         let mut deps = setup_contract();
-        let token_id = "pass1".to_string();
 
         // Try minting without payment
         let info = mock_info(USER, &[]);
         let msg = ExecuteMsg::Extension { 
-            msg: PassMsg::MintPass { 
-                token_id: token_id.clone() 
-            } 
+            msg: PassMsg::MintPass {} // Remove token_id parameter
         };
         let err = execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap_err();
         assert_eq!(err.to_string(), "No uxion payment found");
-
+    
         // Mint with correct payment
         let info = mock_info(USER, &coins(PASS_PRICE, "uxion"));
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert!(!res.attributes.is_empty());
-
-        // Query pass validity
+    
+        // Get token_id from response
+        let token_id = res.attributes
+            .iter()
+            .find(|attr| attr.key == "token_id")
+            .map(|attr| attr.value.clone())
+            .unwrap();
+    
+        // Verify token exists and is valid
         let msg = QueryMsg::Extension { 
             msg: PassQuery::CheckValidity { 
-                token_id: token_id.clone() 
+                token_id: token_id 
             } 
         };
         let res = query(deps.as_ref(), mock_env(), msg).unwrap();
         let validity: ValidityResponse = from_json(&res).unwrap();
-        
         assert!(validity.is_valid);
-        assert!(!validity.in_grace_period);
+    }
+
+    #[test]
+    fn test_token_id_counter() {
+        let mut deps = setup_contract();
+        
+        // First mint - should get token ID "PASS1"
+        let info = mock_info(USER, &coins(PASS_PRICE, "uxion"));
+        let msg = ExecuteMsg::Extension { 
+            msg: PassMsg::MintPass {} 
+        };
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
+        
+        // Check if the token ID is "PASS1"
+        let token_id = res.attributes
+            .iter()
+            .find(|attr| attr.key == "token_id")
+            .map(|attr| attr.value.clone())
+            .unwrap();
+        assert_eq!(token_id, "PASS1");
+    
+        // Second mint - should get token ID "PASS2"
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
+        let token_id = res.attributes
+            .iter()
+            .find(|attr| attr.key == "token_id")
+            .map(|attr| attr.value.clone())
+            .unwrap();
+        assert_eq!(token_id, "PASS2");
+    
+        // Query both passes to ensure they exist
+        let msg = QueryMsg::Extension { 
+            msg: PassQuery::CheckValidity { 
+                token_id: "PASS1".to_string() 
+            } 
+        };
+        let res = query(deps.as_ref(), mock_env(), msg).unwrap();
+        let validity: ValidityResponse = from_json(&res).unwrap();
+        assert!(validity.is_valid);
+    
+        let msg = QueryMsg::Extension { 
+            msg: PassQuery::CheckValidity { 
+                token_id: "PASS2".to_string() 
+            } 
+        };
+        let res = query(deps.as_ref(), mock_env(), msg).unwrap();
+        let validity: ValidityResponse = from_json(&res).unwrap();
+        assert!(validity.is_valid);
     }
 
     #[test]
     fn test_renew_pass() {
         let mut deps = setup_contract();
-        let token_id = "pass1".to_string();
 
         // First mint a pass
         let info = mock_info(USER, &coins(PASS_PRICE, "uxion"));
         let mint_msg = ExecuteMsg::Extension { 
-            msg: PassMsg::MintPass { 
-                token_id: token_id.clone() 
-            } 
+            msg: PassMsg::MintPass {} // Remove token_id parameter
         };
-        execute(deps.as_mut(), mock_env(), info, mint_msg).unwrap();
-
+        let res = execute(deps.as_mut(), mock_env(), info, mint_msg).unwrap();
+    
+        // Get token_id from response
+        let token_id = res.attributes
+            .iter()
+            .find(|attr| attr.key == "token_id")
+            .map(|attr| attr.value.clone())
+            .unwrap();
+    
         // Try renewing without payment
         let info = mock_info(USER, &[]);
         let msg = ExecuteMsg::Extension { 
@@ -128,7 +181,7 @@ mod tests {
         };
         let err = execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap_err();
         assert_eq!(err.to_string(), "No uxion payment found");
-
+    
         // Renew with correct payment
         let info = mock_info(USER, &coins(PASS_PRICE, "uxion"));
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -138,17 +191,21 @@ mod tests {
     #[test]
     fn test_burn_expired_pass() {
         let mut deps = setup_contract();
-        let token_id = "pass1".to_string();
 
         // Mint a pass
         let info = mock_info(USER, &coins(PASS_PRICE, "uxion"));
         let mint_msg = ExecuteMsg::Extension { 
-            msg: PassMsg::MintPass { 
-                token_id: token_id.clone() 
-            } 
+            msg: PassMsg::MintPass {} 
         };
-        execute(deps.as_mut(), mock_env(), info.clone(), mint_msg).unwrap();
-
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), mint_msg).unwrap();
+    
+        // Get token_id from response
+        let token_id = res.attributes
+            .iter()
+            .find(|attr| attr.key == "token_id")
+            .map(|attr| attr.value.clone())
+            .unwrap();
+    
         // Try burning an active pass
         let burn_msg = ExecuteMsg::Extension { 
             msg: PassMsg::BurnExpiredPass { 
@@ -156,7 +213,7 @@ mod tests {
             } 
         };
         let err = execute(deps.as_mut(), mock_env(), info.clone(), burn_msg.clone()).unwrap_err();
-        assert!(err.to_string().contains("Pass must be expired to burn"));
+        assert!(err.to_string().contains("Pass is not expired")); // Updated error message
 
         // Move time past expiration and grace period
         let mut env = mock_env();

@@ -34,6 +34,8 @@ pub fn instantiate(
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     CONFIG.save(deps.storage, &config)?;
+    use crate::state::{Config, TOKEN_ID_COUNTER};
+    TOKEN_ID_COUNTER.save(deps.storage, &0u64)?;
 
     Ok(Response::new()
         .add_attribute("method", "instantiate")
@@ -49,7 +51,7 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::Extension { msg } => match msg {
-            PassMsg::MintPass { token_id } => mint_pass(deps, env, info, token_id),
+            PassMsg::MintPass {} => mint_pass(deps, env, info),
             PassMsg::RenewPass { token_id } => renew_pass(deps, env, info, token_id),
             PassMsg::BurnExpiredPass { token_id } => burn_expired_pass(deps, env, info, token_id),
         },
